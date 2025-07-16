@@ -1,0 +1,5 @@
+ultralytics
+flwr
+torch
+numpy
+opencv-python

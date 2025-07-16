@@ -1,0 +1,56 @@
+import os
+import shutil
+import random
+from pathlib import Path
+
+# Cấu hình
+DATASET_DIR = Path("fire-8")
+CLIENTS = ["client1/dataset", "client2/dataset"]
+CLASSES = ["fire", "smoke"]  # sửa nếu cần
+
+# Gom tất cả ảnh từ train/valid/test
+def gather_all_images():
+    image_paths = []
+    for subset in ["train", "valid", "test"]:
+        img_dir = DATASET_DIR / subset / "images"
+        image_paths += list(img_dir.glob("*.jpg"))
+    return image_paths
+
+# Copy ảnh và nhãn sang thư mục client
+def copy_split(image_list, client_dir):
+    train_split = int(0.8 * len(image_list))
+    train_imgs = image_list[:train_split]
+    val_imgs = image_list[train_split:]
+
+    for split_name, imgs in [("train", train_imgs), ("val", val_imgs)]:
+        img_out = Path(client_dir) / f"images/{split_name}"
+        lbl_out = Path(client_dir) / f"labels/{split_name}"
+        os.makedirs(img_out, exist_ok=True)
+        os.makedirs(lbl_out, exist_ok=True)
+
+        for img_path in imgs:
+            label_path = img_path.parent.parent / "labels" / (img_path.stem + ".txt")
+            shutil.copy(img_path, img_out / img_path.name)
+            shutil.copy(label_path, lbl_out / label_path.name)
+
+    # Ghi file data.yaml
+    yaml_path = Path(client_dir) / "data.yaml"
+    with open(yaml_path, "w") as f:
+        f.write(f"train: {str(Path(client_dir) / 'images/train').replace('\\', '/')}\n")
+        f.write(f"val: {str(Path(client_dir) / 'images/val').replace('\\', '/')}\n\n")
+        f.write(f"nc: {len(CLASSES)}\n")
+        f.write(f"names: {CLASSES}\n")
+
+# MAIN
+all_images = gather_all_images()
+random.seed(42)
+random.shuffle(all_images)
+
+half = len(all_images) // 2
+client1_imgs = all_images[:half]
+client2_imgs = all_images[half:]
+
+copy_split(client1_imgs, CLIENTS[0])
+copy_split(client2_imgs, CLIENTS[1])
+
+print("✅ Đã chia dataset cho client1 và client2.")
